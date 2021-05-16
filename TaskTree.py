@@ -15,9 +15,7 @@ class TaskTreeNode(QTreeWidgetItem):
         for idx,eachData in enumerate(data):
             self.setData(idx, QtCore.Qt.EditRole, eachData)
 
-        # 检查是否需要创建空子行
-        if self.data(0, QtCore.Qt.EditRole):
-            TaskTreeNode(self, ['',''])
+
         self.setExpanded(False)
 
         self.colorIdx = 0
@@ -26,6 +24,7 @@ class TaskTreeNode(QTreeWidgetItem):
 
         self.setBackgroundColor(0, TaskTreeNode.colors[self.colorIdx])
         self.setBackgroundColor(1, TaskTreeNode.colors[self.colorIdx])
+
 
     def isEmpty(self):
         isEmpty = True

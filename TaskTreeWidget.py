@@ -77,10 +77,23 @@ class TaskTreeWidget(QTreeWidget):
         # self.setContextMenuPolicy(Qt.CustomContextMenu)
         # self.customContextMenuRequested.connect(self.onMenuRequested)
 
-        self.loadData()
+    def loadData(self, data, parent):
+        if data:
+            for taskData in data:
+                cur = None
+                if parent is None:
+                    cur = TaskTreeNode(self, taskData['data'])
+                    self.addTopLevelItem(cur)
+                else:
+                    cur = TaskTreeNode(parent, taskData['data'])
 
-    def loadData(self):
-        self.addTopLevelItem(TaskTreeNode(self, ['','']))
+                self.loadData(taskData['child'], cur)
+        
+        if parent is None:
+            self.addTopLevelItem(TaskTreeNode(self, ['','']))
+        else:
+            TaskTreeNode(parent, ['',''])
+
 
 
     def saveData(self, item : TaskTreeNode = None, dataDict: dict = None):
@@ -143,7 +156,6 @@ class TaskTreeWidget(QTreeWidget):
 
         if isLast and not item.isEmpty():
             # 插入空行
-            print(item.data(0,0))
             TaskTreeNode(item, ['',''])
             TaskTreeNode(parent if parent else self, ['', ''])
         
@@ -152,6 +164,9 @@ class TaskTreeWidget(QTreeWidget):
                 parent.takeChild(parent.indexOfChild(item))
             else:
                 self.takeTopLevelItem(self.indexOfTopLevelItem(item))
+
+        if item.isEmpty():
+            item.setData(1, Qt.EditRole, '')
 
         self.blockSignals(False)
         return
