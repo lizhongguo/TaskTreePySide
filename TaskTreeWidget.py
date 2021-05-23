@@ -4,7 +4,7 @@ import sys
 import os
 from PySide2.QtGui import QBrush, QPainter, QPen
 
-from PySide2.QtWidgets import QApplication, QDateTimeEdit, QMainWindow, QMenu, QPlainTextEdit, QStyledItemDelegate, QTreeView, QTreeWidget, QTreeWidgetItem, QWidgetItem,QLineEdit
+from PySide2.QtWidgets import QApplication, QCheckBox, QDateTimeEdit, QMainWindow, QMenu, QPlainTextEdit, QStyledItemDelegate, QTreeView, QTreeWidget, QTreeWidgetItem, QWidgetItem,QLineEdit
 from PySide2.QtCore import QFile, Qt, QModelIndex
 from PySide2.QtUiTools import QUiLoader
 from MainUi import Ui_TaskTreeMain
@@ -16,9 +16,9 @@ class TaskTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.setColumnCount(2)
+        self.setColumnCount(3)
         #设置树形控件头部的标题
-        self.setHeaderLabels(['description','deadline'])
+        self.setHeaderLabels(['description','deadline','state'])
         self.setRootIsDecorated(True)
         #设置树形控件的列的宽度
 
@@ -90,9 +90,9 @@ class TaskTreeWidget(QTreeWidget):
                 self.loadData(taskData['child'], cur)
         
         if parent is None:
-            self.addTopLevelItem(TaskTreeNode(self, ['','']))
+            self.addTopLevelItem(TaskTreeNode(self))
         else:
-            TaskTreeNode(parent, ['',''])
+            TaskTreeNode(parent)
 
 
 
@@ -156,8 +156,8 @@ class TaskTreeWidget(QTreeWidget):
 
         if isLast and not item.isEmpty():
             # 插入空行
-            TaskTreeNode(item, ['',''])
-            TaskTreeNode(parent if parent else self, ['', ''])
+            TaskTreeNode(item)
+            TaskTreeNode(parent if parent else self)
         
         if item.isEmpty() and not isLast:
             if parent:
@@ -190,6 +190,14 @@ class DatetimeDelegate(QStyledItemDelegate):
             datetimeEdit.setCalendarPopup(True)
             datetimeEdit.activateWindow()
             return datetimeEdit
+    
+        if index.column() == 2:
+            chkBox = QCheckBox('Finished', parent)
+            if index.model().data(index, Qt.EditRole) == 'Unfinished':
+                chkBox.setChecked(False)
+            else:
+                chkBox.setChecked(True)
+            return chkBox
 
         #return ItemWidget(parent)
 
@@ -198,20 +206,30 @@ class DatetimeDelegate(QStyledItemDelegate):
         return QLineEdit(parent)
 
     def setModelData(self, editor: PySide2.QtWidgets.QWidget, model: QtCore.QAbstractItemModel, index: QtCore.QModelIndex) -> None:
+        if index.column()==2:
+            cb:QCheckBox = editor
+            if cb.checkState() == Qt.CheckState.Checked:
+                model.setData(index, 'Finished', Qt.EditRole)
+            else:
+                model.setData(index, 'Uninished', Qt.EditRole)
+            return
         model.setData(index, editor.text())
         return
 
     # 通过重载下面两个函数，可实现自定义样式的绘制
     def paint(self, painter: QtGui.QPainter, option: QtWidgets.QStyleOptionViewItem, index: QtCore.QModelIndex) -> None:
-        return super().paint(painter, option, index)
 
-        pen = QPen(Qt.black, 2, Qt.SolidLine)
-        painter.setPen(pen)
-        rect:QtCore.QRect = option.rect
+        super().paint(painter, option, index)
+        checked = index.model().data(index.model().index(index.row(),2,index.parent()))
+        print(checked,index.row(),index.column())        
+        if checked == 'Finished':
+            pen = QPen(Qt.black, 2, Qt.SolidLine)
+            painter.setPen(pen)
+            rect:QtCore.QRect = option.rect
 
-        y = int(0.5*rect.height() + rect.y())
-        painter.drawLine(rect.x(),y,rect.x()+rect.width(),y)
-        return super().paint(painter, option, index)
+            y = int(0.5*rect.height() + rect.y())
+            painter.drawLine(rect.x(),y,rect.x()+rect.width(),y)
+
 
 
     def editorEvent(self, event: PySide2.QtCore.QEvent, model: PySide2.QtCore.QAbstractItemModel, option: PySide2.QtWidgets.QStyleOptionViewItem, index: PySide2.QtCore.QModelIndex) -> bool:
