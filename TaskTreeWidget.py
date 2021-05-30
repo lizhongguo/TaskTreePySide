@@ -4,7 +4,7 @@ import sys
 import os
 from PySide2.QtGui import QBrush, QPainter, QPen
 
-from PySide2.QtWidgets import QApplication, QCheckBox, QDateTimeEdit, QMainWindow, QMenu, QPlainTextEdit, QStyledItemDelegate, QTreeView, QTreeWidget, QTreeWidgetItem, QWidgetItem,QLineEdit
+from PySide2.QtWidgets import QApplication, QCheckBox, QDateTimeEdit, QDialogButtonBox, QMainWindow, QMenu, QPlainTextEdit, QPushButton, QStyledItemDelegate, QTreeView, QTreeWidget, QTreeWidgetItem, QWidgetItem,QLineEdit
 from PySide2.QtCore import QFile, Qt, QModelIndex
 from PySide2.QtUiTools import QUiLoader
 from MainUi import Ui_TaskTreeMain
@@ -16,7 +16,7 @@ class TaskTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.setColumnCount(3)
+        self.setColumnCount(4)
         #设置树形控件头部的标题
         self.setHeaderLabels(['description','deadline','state'])
         self.setRootIsDecorated(True)
@@ -77,20 +77,32 @@ class TaskTreeWidget(QTreeWidget):
         # self.setContextMenuPolicy(Qt.CustomContextMenu)
         # self.customContextMenuRequested.connect(self.onMenuRequested)
 
+        self.header().setSectionsClickable(True)
+        self.header().sectionClicked.connect(lambda : print('hello'))
+
+        # self.setHeaderItem()
+
+    def createTaskTreeNode(self, parent, taskData=None):
+        if not taskData:
+            taskData = ''
+        node = TaskTreeNode(parent, taskData)
+        self.setItemWidget(node, 3, QPushButton(self))
+        return node
+
     def loadData(self, data, parent):
         if data:
             for taskData in data:
                 cur = None
                 if parent is None:
-                    cur = TaskTreeNode(self, taskData['data'])
+                    cur = self.createTaskTreeNode(self, taskData['data'])
                     self.addTopLevelItem(cur)
                 else:
-                    cur = TaskTreeNode(parent, taskData['data'])
+                    cur = self.createTaskTreeNode(parent, taskData['data'])
 
                 self.loadData(taskData['child'], cur)
         
         if parent is None:
-            self.addTopLevelItem(TaskTreeNode(self))
+            self.addTopLevelItem(self.createTaskTreeNode(self))
         else:
             TaskTreeNode(parent)
 
@@ -156,8 +168,13 @@ class TaskTreeWidget(QTreeWidget):
 
         if isLast and not item.isEmpty():
             # 插入空行
-            TaskTreeNode(item)
-            TaskTreeNode(parent if parent else self)
+            self.createTaskTreeNode(item, None)
+            # curItem = TaskTreeNode(item)
+            # self.setItemWidget(curItem, 3, QPushButton("Test"))
+
+            self.createTaskTreeNode(parent if parent else self, None)
+            # parentItem = TaskTreeNode(parent if parent else self)
+            # self.setItemWidget(parentItem, 3, QPushButton("Test"))
         
         if item.isEmpty() and not isLast:
             if parent:
