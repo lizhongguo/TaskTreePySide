@@ -4,25 +4,62 @@ import sys
 import os
 from PySide2.QtGui import QBrush, QPainter, QPen
 
-from PySide2.QtWidgets import QApplication, QCheckBox, QDateTimeEdit, QDialogButtonBox, QMainWindow, QMenu, QPlainTextEdit, QPushButton, QStyledItemDelegate, QTreeView, QTreeWidget, QTreeWidgetItem, QWidgetItem,QLineEdit
-from PySide2.QtCore import QFile, Qt, QModelIndex
+from PySide2.QtWidgets import QApplication, QCheckBox, QDateTimeEdit, QDialogButtonBox, QHBoxLayout, QMainWindow, QMenu, QPlainTextEdit, QPushButton, QStyle, QStyledItemDelegate, QTextEdit, QTreeView, QTreeWidget, QTreeWidgetItem, QWidget, QWidgetItem,QLineEdit
+from PySide2.QtCore import QFile, QMargins, Qt, QModelIndex
 from PySide2.QtUiTools import QUiLoader
 from MainUi import Ui_TaskTreeMain
 from TaskTree import TaskTreeNode
 import PySide2
 from PySide2 import QtCore, QtWidgets,QtGui
 
+class Header(QtWidgets.QHeaderView):
+    def __init__(self, orientation, parent=None):
+        super(Header, self).__init__(orientation, parent)
+
+        self.button = QTextEdit('',self)
+        self.button.setContentsMargins(0,0,0,0)
+
+
+class ButtonBox(QWidget):
+    def __init__(self, parent, node) -> None:
+        super().__init__(parent=parent)
+        self.layout = QHBoxLayout(self)
+        self.buttonPlus = QPushButton('+', self)
+        self.buttonPlus.setContentsMargins(0,0,0,0)
+        self.buttonMinus = QPushButton('-', self)
+        self.buttonMinus.setContentsMargins(0,0,0,0)
+        self.layout.addWidget(self.buttonPlus)
+        self.layout.addWidget(self.buttonMinus)
+        self.setContentsMargins(0,0,0,0)
+        self.node = node
+        self.par = parent
+
+        self.buttonPlus.clicked.connect(self.onPlus)
+        self.buttonMinus.clicked.connect(self.onMinus)
+
+    def onPlus(self):
+        self.par.createTaskTreeNode(self.node)
+
+    def onMinus(self):
+        self.par.removeTaskTreeNode(self.node)
+        
+
 class TaskTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+
         self.setColumnCount(4)
+
         #设置树形控件头部的标题
-        self.setHeaderLabels(['description','deadline','state'])
+        self.setHeaderLabels(['description','deadline','state', 'action'])
         self.setRootIsDecorated(True)
         #设置树形控件的列的宽度
+        # self.setHeaderHidden(True)
 
-        self.setColumnWidth(0,400)
+        # self.createHeader()
+
+        # self.setColumnWidth(0,400)
 
         #设置根节点
         # root = TaskTreeNode(self, ['Root'])
@@ -61,7 +98,7 @@ class TaskTreeWidget(QTreeWidget):
 
         #响应双击时间
         self.doubleClicked.connect(self.onDoubleClicked)
-        self.itemChanged.connect(self.onItemChanged)
+        # self.itemChanged.connect(self.onItemChanged)
         #self.treeWidget.clicked.connect(self.onClicked)
 
         #节点全部展开
@@ -77,17 +114,43 @@ class TaskTreeWidget(QTreeWidget):
         # self.setContextMenuPolicy(Qt.CustomContextMenu)
         # self.customContextMenuRequested.connect(self.onMenuRequested)
 
+        #双击顶部显示事件
         self.header().setSectionsClickable(True)
-        self.header().sectionClicked.connect(lambda : print('hello'))
+        self.header().sectionClicked.connect(self.onSectionClicked)
 
+        # headerItem = QTreeWidgetItem()
+        # headerItem.setText(0, 'A')
+        # headerItem.setText(1, 'B')
+        # headerItem.setText(2, 'C')
+        # headerItem.setText(3, 'D')
+        # self.setItemWidget(headerItem,3,QPushButton('Add'))
+        # self.setHeaderItem(headerItem)
         # self.setHeaderItem()
+
+    def onSectionClicked(self):
+        self.addTopLevelItem(self.createTaskTreeNode(self))
+
+    def createHeader(self):
+        header = Header(QtCore.Qt.Horizontal, self)
+        self.setHeader(header)
 
     def createTaskTreeNode(self, parent, taskData=None):
         if not taskData:
             taskData = ''
         node = TaskTreeNode(parent, taskData)
-        self.setItemWidget(node, 3, QPushButton(self))
+
+        buttonBox = ButtonBox(self, node)
+
+        self.setItemWidget(node, 3, buttonBox)
         return node
+
+    def removeTaskTreeNode(self, node:TaskTreeNode):
+        parent = node.parent()
+        if parent:
+            parent.takeChild(parent.indexOfChild(node))
+        else:
+            self.takeTopLevelItem(self.indexOfTopLevelItem(node))
+
 
     def loadData(self, data, parent):
         if data:
@@ -100,12 +163,6 @@ class TaskTreeWidget(QTreeWidget):
                     cur = self.createTaskTreeNode(parent, taskData['data'])
 
                 self.loadData(taskData['child'], cur)
-        
-        if parent is None:
-            self.addTopLevelItem(self.createTaskTreeNode(self))
-        else:
-            TaskTreeNode(parent)
-
 
 
     def saveData(self, item : TaskTreeNode = None, dataDict: dict = None):
@@ -114,7 +171,7 @@ class TaskTreeWidget(QTreeWidget):
 
         if item is None:
             dataList = []
-            for idx in range(self.topLevelItemCount()-1):
+            for idx in range(self.topLevelItemCount()):
                 treeNode = self.topLevelItem(idx)
                 dataDict = {}
                 self.saveData(treeNode, dataDict)
@@ -124,7 +181,7 @@ class TaskTreeWidget(QTreeWidget):
         if not item.isEmpty():
             dataDict['data'] = [item.data(i, Qt.EditRole) for i in range(item.columnCount())]
             dataDict['child'] = []
-            for i in range(item.childCount()-1):
+            for i in range(item.childCount()):
                 cDataDict = {}
                 self.saveData(item.child(i), cDataDict)
                 dataDict['child'].append(cDataDict)
@@ -147,46 +204,6 @@ class TaskTreeWidget(QTreeWidget):
             else:
                 parentItem = item.parent()
                 parentItem.takeChild(parentItem.indexOfChild(item))
-
-    def onItemChanged(self, item:TaskTreeNode, column:int):
-        #可以在这儿实现删除
-        #保持最后一行为空
-
-        # 1. 非空行都包含一个空子行, 默认不展开,空行不包含子行
-        # 2. 如果将空行修改为了非空行,则需要增加一个空行
-        # 3. 如果将非空行修改为了空行,则需要删除该行
-
-        # 判断item是否是最后一个
-        isLast = True
-        parent = item.parent()
-        if parent is None:
-            isLast = self.indexOfTopLevelItem(item) == self.topLevelItemCount()-1
-        else:
-            isLast = parent.indexOfChild(item) == parent.childCount()-1
-
-        self.blockSignals(True)
-
-        if isLast and not item.isEmpty():
-            # 插入空行
-            self.createTaskTreeNode(item, None)
-            # curItem = TaskTreeNode(item)
-            # self.setItemWidget(curItem, 3, QPushButton("Test"))
-
-            self.createTaskTreeNode(parent if parent else self, None)
-            # parentItem = TaskTreeNode(parent if parent else self)
-            # self.setItemWidget(parentItem, 3, QPushButton("Test"))
-        
-        if item.isEmpty() and not isLast:
-            if parent:
-                parent.takeChild(parent.indexOfChild(item))
-            else:
-                self.takeTopLevelItem(self.indexOfTopLevelItem(item))
-
-        if item.isEmpty():
-            item.setData(1, Qt.EditRole, '')
-
-        self.blockSignals(False)
-        return
 
     # def onClicked(self,qmodeLindex:QModelIndex):
     #     item=self.treeWidget.currentItem()
@@ -238,7 +255,7 @@ class DatetimeDelegate(QStyledItemDelegate):
 
         super().paint(painter, option, index)
         checked = index.model().data(index.model().index(index.row(),2,index.parent()))
-        print(checked,index.row(),index.column())        
+        # print(checked,index.row(),index.column())        
         if checked == 'Finished':
             pen = QPen(Qt.black, 2, Qt.SolidLine)
             painter.setPen(pen)
